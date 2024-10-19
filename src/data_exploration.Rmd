@@ -12,48 +12,93 @@ knitr::opts_chunk$set(echo = TRUE)
 
 This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
-```
-
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
-
-``` {r}
-plst[1]
-```
-```{r}
-library(plyr)
-
-df = ldply(plst)
-```
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document.
 
 ```{r}
-colnames(df)
-```
-
-```{r}
-library(reshape2)
-
-# Filter rows where spread is 0
-df_filtered <- df[df$line == 0, ]
-
-# Pivot the data and compute the average for duplicates
-df_wide <- dcast(df_filtered, m ~ gt, value.var = "prb", fun.aggregate = mean)
-```
-
-```{r}
+library(dplyr)
+library(tidyr)
 library(openxlsx)
+```
+```{r}
+# Creating a dataframe from the large list
+df <- bind_rows(plst)
+```
 
+```{r}
+# Removing duplicates (all around the end of quarter/start of quarter)
+
+df <- df %>% distinct(gt, m, line, .keep_all = TRUE) #keeps last duplicate (start of next quarter)
+```
+
+```{r}
+df_enhanced <- df %>%
+  # Create the lagged versions of H_P (2-point and 3-point shifts) using left_join
+  left_join(
+    df %>% select(gt, line, m, H_P) %>% mutate(m = m + 2),  # 2-point lag
+    by = c("gt", "line", "m"), #Match on gt, line, and m (shifted)
+    suffix = c("", "M2") # Give the joined H_P column a new name
+  ) %>%
+  left_join(
+    df %>% select(gt, line, m, H_P) %>% mutate(m = m + 3),  # 3-point lag
+    by = c("gt", "line", "m"),
+    suffix = c("", "M3")
+  ) %>%
+  left_join(
+    df %>% select(gt, line, m, H_P) %>% mutate(m = m + 4),  # 4-point lag
+    by = c("gt", "line", "m"),
+    suffix = c("", "M4")
+  ) %>%
+  # Create new columns for 'nobasket_1' and 'nobasket_3' using the lagged values
+  mutate(
+    H_M2 = H_PM2,  # 1-point lag
+    H_M3 = H_PM3,   # 3-point lag
+    H_M4 = H_PM4   # 4-point lag
+  ) %>%
+  # Drop the temporary lagged columns
+  select(-H_PM2, -H_PM3, -H_PM4)
+```
+
+```{r}
+# Fill in N/A values for H_M2 with avg of H_M1 and H_M3, fill in N/A values for H_M3 with avg of H_M2 and H_M4
+
+
+##TODO FIX BUGS IN THIS
+df_enhanced <- df_enhanced %>%
+  mutate(
+    H_M2 = replace_na(H_M2, (H_M1 + H_M3) / 2),
+    H_M3 = replace_na(H_M3, (H_M2 + H_M4) / 2)
+  )
+```
+
+```{r}
+
+# Add columns for each type of challenge
+
+df_enhanced <- df_enhanced %>%
+  mutate(
+    oob_challenge = H_P - A_P,
+    nofoul2_keepBall = H_P - A_FT2,
+    nofoul2_jumpBall = (H_P+A_P)/2 - A_FT2,
+    nofoul2_loseBall = A_P - A_FT2,
+    nofoul3_keepBall = H_P - A_FT3,
+    nofoul3_jumpBall = (H_P+A_P)/2 - A_FT3,
+    nofoul3_loseBall = A_P - A_FT3,
+    # lagged challenges below
+    )
+```
+
+```{r}
+df_filtered <- df_enhanced %>%
+  filter(line == 0) %>%
+  pivot_wider(
+    names_from = gt,
+    values_from = oob_challenge,
+    id_cols = m,
+  )
+```
+
+
+```{r}
 # for writing a data.frame or list of data.frames to an xlsx file
-write.xlsx(df, 'sample_data.xlsx')
+write.xlsx(df_filtered, file='sample_data2.xlsx', sheetName='oob_challenge')
 ```

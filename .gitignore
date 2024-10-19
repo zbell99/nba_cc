@@ -1,6 +1,6 @@
-#Data
-/data/
-
+#Keep repo clean
+*.xlsx
+*.RData
 
 # History files
 .Rhistory
