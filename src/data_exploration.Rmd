@@ -20,6 +20,7 @@ library(tidyr)
 library(openxlsx)
 library(ggplot2)
 library(ggthemes)
+library(jsonlite)
 ```
 
 ```{r}
@@ -69,22 +70,6 @@ df_enhanced <- df_enhanced %>%
 ```
 
 ```{r}
-#NOT NEEDED: BETTER FORMAT USED ABOVE
-# Fill in N/A values for H_M2 with avg of H_M1 and H_M3, fill in N/A values for H_M3 with avg of H_M2 and H_M4
-'''
-df_enhanced <- df_enhanced %>%
-  mutate(
-    H_M2 = ifelse(is.na(H_M2) & !is.na(H_M1) & !is.na(H_M3),
-                  (H_M1 + H_M3) / 2,
-                  H_M2),
-    H_M3 = ifelse(is.na(H_M3) & !is.na(H_M2) & !is.na(H_M4),
-                  (H_M2 + H_M4) / 2,
-                  H_M3)
-  )
-'''
-```
-
-```{r}
 #data summary of missing values
 df_enhanced %>%
   summarise_all(~sum(is.na(.)))
@@ -116,6 +101,58 @@ df_enhanced <- df_enhanced %>%
     noand1 = H_P - A_FT1_M2,
     )
 ```
+
+
+```{r}
+# Convert the df_enhanced into a low cost JSON format for quick access in the future
+wpa_df <- df_enhanced %>%
+  select(gt, line, m, oob_challenge, nofoul2_keepBall, nofoul2_jumpBall, nofoul2_loseBall, nofoul3_keepBall, nofoul3_jumpBall, nofoul3_loseBall, nogoaltend, noand1)
+
+# Build nested structure: line -> gt -> m -> challenge values
+wpa_json_structure <- list()
+
+for (line_val in unique(wpa_df$line)) {
+  line_data <- wpa_df %>% filter(line == line_val)
+  line_nested <- list()
+  
+  for (gt_val in unique(line_data$gt)) {
+    gt_data <- line_data %>% filter(gt == gt_val)
+    gt_nested <- list()
+    
+    for (m_val in unique(gt_data$m)) {
+      m_data <- gt_data %>% filter(m == m_val)
+      
+      # Extract challenge values wrapped in wpa objects (should be single row after filtering)
+      challenge_values <- list(
+        oob_challenge = list(wpa = m_data$oob_challenge[[1]]),
+        nofoul2_keepBall = list(wpa = m_data$nofoul2_keepBall[[1]]),
+        nofoul2_jumpBall = list(wpa = m_data$nofoul2_jumpBall[[1]]),
+        nofoul2_loseBall = list(wpa = m_data$nofoul2_loseBall[[1]]),
+        nofoul3_keepBall = list(wpa = m_data$nofoul3_keepBall[[1]]),
+        nofoul3_jumpBall = list(wpa = m_data$nofoul3_jumpBall[[1]]),
+        nofoul3_loseBall = list(wpa = m_data$nofoul3_loseBall[[1]]),
+        nogoaltend = list(wpa = m_data$nogoaltend[[1]]),
+        noand1 = list(wpa = m_data$noand1[[1]])
+      )
+      
+      # Use character keys to ensure proper JSON formatting
+      gt_nested[[as.character(m_val)]] <- challenge_values
+    }
+    
+    line_nested[[as.character(gt_val)]] <- gt_nested
+  }
+  
+  wpa_json_structure[[as.character(line_val)]] <- line_nested
+}
+
+# Export to JSON with pretty formatting
+wpa_json <- toJSON(wpa_json_structure, pretty = TRUE, auto_unbox = TRUE)
+write(wpa_json, file = "data/wpa_challenge_values.json")
+
+
+
+```
+
 
 ```{r}
 df_oob_same_odds <- df_enhanced %>%
