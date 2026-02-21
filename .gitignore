@@ -1,6 +1,7 @@
 #Keep repo clean
 *.xlsx
 *.RData
+/data/
 
 # History files
 .Rhistory
