@@ -18,8 +18,13 @@ When you click the **Knit** button a document will be generated that includes bo
 library(dplyr)
 library(tidyr)
 library(openxlsx)
+library(ggplot2)
+library(ggthemes)
 ```
+
 ```{r}
+# Load the data from the RDS file
+load("data/nbaWinProb.RData")
 # Creating a dataframe from the large list
 df <- bind_rows(plst)
 ```
@@ -31,43 +36,67 @@ df <- df %>% distinct(gt, m, line, .keep_all = TRUE) #keeps last duplicate (star
 ```
 
 ```{r}
+# ADDING COLUMN FOR 2 POINT LAG
 df_enhanced <- df %>%
-  # Create the lagged versions of H_P (2-point and 3-point shifts) using left_join
   left_join(
-    df %>% select(gt, line, m, H_P) %>% mutate(m = m + 2),  # 2-point lag
-    by = c("gt", "line", "m"), #Match on gt, line, and m (shifted)
-    suffix = c("", "M2") # Give the joined H_P column a new name
-  ) %>%
+    df %>% select(gt, line, m, H_P) %>%
+    mutate(m = m + 2),
+    by = c("gt", "line", "m"), suffix = c("", "_m2")) %>%  # 2 point lag through data filtering
   left_join(
-    df %>% select(gt, line, m, H_P) %>% mutate(m = m + 3),  # 3-point lag
+    df %>% select(gt, line, m, H_M1) %>% mutate(m = m + 1),  # 2 point lag, but using the pre-populated 1 point lag
     by = c("gt", "line", "m"),
-    suffix = c("", "M3")
+    suffix = c("", "_m1")
   ) %>%
-  left_join(
-    df %>% select(gt, line, m, H_P) %>% mutate(m = m + 4),  # 4-point lag
-    by = c("gt", "line", "m"),
-    suffix = c("", "M4")
-  ) %>%
-  # Create new columns for 'nobasket_1' and 'nobasket_3' using the lagged values
   mutate(
-    H_M2 = H_PM2,  # 1-point lag
-    H_M3 = H_PM3,   # 3-point lag
-    H_M4 = H_PM4   # 4-point lag
+    H_M2 = coalesce(H_P_m2, H_M1_m1)  # Fill in with m+2, if missing, use m+1
   ) %>%
-  # Drop the temporary lagged columns
-  select(-H_PM2, -H_PM3, -H_PM4)
+  select(-H_P_m2, -H_M1_m1)  # Drop the temporary columns
+
+# ADDING COLUMN FOR 2 point lag on A_FT1
+df_enhanced <- df_enhanced %>%
+  left_join(
+    df %>% select(gt, line, m, A_FT1) %>% mutate(m = m + 2),
+    by = c("gt", "line", "m"), suffix = c("", "_m2")) %>%  # 2 point lag through data filtering
+  left_join(
+    df %>% select(gt, line, m, A_FT1_M1) %>% mutate(m = m + 1),  # 2 point lag, but using the pre-populated 1 point lag
+    by = c("gt", "line", "m"),
+    suffix = c("", "_m1")
+  ) %>%
+  mutate(
+    A_FT1_M2 = coalesce(A_FT1_m2, A_FT1_M1_m1)  # Fill in with m+2, if missing, use m+1
+  ) %>%
+  select(-A_FT1_m2, -A_FT1_M1_m1)  # Drop the temporary columns
 ```
 
 ```{r}
+#NOT NEEDED: BETTER FORMAT USED ABOVE
 # Fill in N/A values for H_M2 with avg of H_M1 and H_M3, fill in N/A values for H_M3 with avg of H_M2 and H_M4
-
-
-##TODO FIX BUGS IN THIS
+'''
 df_enhanced <- df_enhanced %>%
   mutate(
-    H_M2 = replace_na(H_M2, (H_M1 + H_M3) / 2),
-    H_M3 = replace_na(H_M3, (H_M2 + H_M4) / 2)
+    H_M2 = ifelse(is.na(H_M2) & !is.na(H_M1) & !is.na(H_M3),
+                  (H_M1 + H_M3) / 2,
+                  H_M2),
+    H_M3 = ifelse(is.na(H_M3) & !is.na(H_M2) & !is.na(H_M4),
+                  (H_M2 + H_M4) / 2,
+                  H_M3)
   )
+'''
+```
+
+```{r}
+#data summary of missing values
+df_enhanced %>%
+  summarise_all(~sum(is.na(.)))
+
+#value counts of 'm' column for missing values of H_M3
+df_enhanced %>%
+  filter(is.na(A_FT1_M2)) %>%
+  count(m)
+
+#filter out all rows with 'm' absolute value greater than 18 since these values are sticking as N/A
+df_enhanced <- df_enhanced %>%
+  filter(abs(m) < 20)
 ```
 
 ```{r}
@@ -83,12 +112,13 @@ df_enhanced <- df_enhanced %>%
     nofoul3_keepBall = H_P - A_FT3,
     nofoul3_jumpBall = (H_P+A_P)/2 - A_FT3,
     nofoul3_loseBall = A_P - A_FT3,
-    # lagged challenges below
+    nogoaltend = (H_P+A_P)/2 - H_M2,
+    noand1 = H_P - A_FT1_M2,
     )
 ```
 
 ```{r}
-df_filtered <- df_enhanced %>%
+df_oob_same_odds <- df_enhanced %>%
   filter(line == 0) %>%
   pivot_wider(
     names_from = gt,
@@ -97,8 +127,99 @@ df_filtered <- df_enhanced %>%
   )
 ```
 
+```{r}
+df_oob_same_score <- df_enhanced %>%
+  filter(m == 0) %>%
+  pivot_wider(
+    names_from = gt,
+    values_from = oob_challenge,
+    id_cols = line,
+  )
+```
+
+```{r}
+df_enhanced %>%
+  filter(line == 0) %>%
+  filter(m %in% c(-16, -10, -5, -3, -2, -1, 0)) %>%
+  select(gt, oob_challenge, m) %>%
+  ggplot(aes(x = gt, y = oob_challenge, color = factor(m))) +
+  geom_line() +
+  labs(title = "Out Of Bounds Challenge",
+       x = "Time (720 seconds = 1 quarter)",
+       y = "Win % Added Due to Successful Challenge",
+       color = "Score Difference") +
+  expand_limits(y =0) +
+  scale_x_continuous(
+    breaks = seq(0, 2880, by = 360), # Set labels every 360 seconds
+  ) +
+  scale_color_colorblind() +
+  theme_minimal()
+
+df_enhanced %>%
+  filter(m == 0) %>%
+  filter(line %in% c(-20, -15, -10, -5, 0)) %>%
+  select(gt, oob_challenge, line) %>%
+  ggplot(aes(x = gt, y = oob_challenge, color = factor(line))) +
+  geom_line() +
+  labs(title = "Out Of Bounds Challenge",
+       x = "Time (720 seconds = 1 quarter)",
+       y = "Win % Added Due to Successful Challenge",
+       color = "Betting Line") +
+  expand_limits(y =0) +
+  scale_x_continuous(
+    breaks = seq(0, 2880, by = 360), # Set labels every 360 seconds
+  ) +
+  scale_color_colorblind() +
+  theme_minimal()
+
+ggplot(df_enhanced %>% filter(line == 0, m == 0), aes(x = gt)) +
+  geom_line(aes(y = oob_challenge, color = "oob_challenge")) +
+  geom_line(aes(y = nofoul2_keepBall, color = "nofoul2_keepBall")) +
+  geom_line(aes(y = nofoul2_jumpBall, color = "nofoul2_jumpBall")) +
+  geom_line(aes(y = nofoul2_loseBall, color = "nofoul2_loseBall")) +
+  geom_line(aes(y = nofoul3_keepBall, color = "nofoul3_keepBall")) +
+  #geom_line(aes(y = nofoul3_jumpBall, color = "nofoul3_jumpBall")) +
+  #geom_line(aes(y = nofoul3_loseBall, color = "nofoul3_loseBall")) +
+  geom_line(aes(y = nogoaltend, color = "nogoaltend")) +
+  geom_line(aes(y = noand1, color = "noand1")) +
+  expand_limits(y =0) +
+  scale_x_continuous(
+    breaks = seq(0, 2880, by = 360), # Set labels every 360 seconds
+  ) +
+  scale_color_colorblind(
+    labels = c("oob_challenge" = "Out of Bounds", 
+               "nofoul2_keepBall" = "Foul and Recover Ball",
+               "nofoul2_jumpBall" = "Foul but Jump Ball",
+               "nofoul2_loseBall" = "Foul but Opponent Ball",
+               "nofoul3_keepBall" = "3 pt foul, Recover Ball",
+               "nofoul3_jumpBall" = "3 pt foul, Jump Ball",
+               "nofoul3_loseBall" = "3 pt foul, Opponent Ball",
+               "noand1" = "And-1 foul overturned",
+               "nogoaltend" = "Goaltend call overturned")
+  ) +
+  labs(title = "Tie Game",
+       x = "Time (720 seconds = 1 quarter)",
+       y = "Win % Added Due to Successful Challenge",
+       color = "Challenge Type") +
+  theme_minimal()
+
+```
+```{r}
+#divide nofoul3_jumpball/nofoul2_jumpball and show distribution
+
+quotients <- na.omit(df_enhanced$nofoul3_jumpBall  / df_enhanced$nofoul2_jumpBall)
+quotients <- quotients[is.finite(quotients)] 
+
+summary(quotients)
+plot(density(quotients), xlim=c(0, 4))
+```
+
 
 ```{r}
 # for writing a data.frame or list of data.frames to an xlsx file
-write.xlsx(df_filtered, file='sample_data2.xlsx', sheetName='oob_challenge')
+#write.xlsx(df_oob_same_odds, file='sample_data.xlsx', sheetName='oob_challenge_full_grid')
+#write.xlsx(df_oob_same_score, file='sample_data.xlsx', sheetName='oob_challenge_same_score', append=TRUE)
+
+list_of_datasets <- list("oob_challenge_same_odds" = df_oob_same_odds, "oob_challenge_same_score" = df_oob_same_score)
+write.xlsx(list_of_datasets, file = "sample_data.xlsx")
 ```
