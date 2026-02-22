@@ -52,12 +52,20 @@ if __name__ == "__main__":
 
 ---
 
-## 2. Naming Conventions
+
+## 2. Naming Conventions & Column Access
+
 
 ### Variables and Functions
 - **Style**: `snake_case`
 - **Descriptive**: Names should clearly indicate content/purpose
 - **Abbreviations**: Acceptable for well-known terms (`df`, `gdf`, `ot`, `pbp`)
+
+### Data Dictionary Enums (Column Names)
+- **Use enums for column names**: When referencing canonical columns in pipeline code, use a data dictionary enum (e.g., `NBA_SNAPSHOT_DATA_DICTIONARY`) instead of string literals. This ensures consistency and reduces typos.
+- **Pattern**: `df[NBA_SNAPSHOT_DATA_DICTIONARY.SCORE_MARGIN.value]` instead of `df["score_margin"]`
+- **Add new enums** for new datasets or tables as needed, following the pattern in `src/DOCUMENTATION/DATA_DICTIONARIES/`.
+
 
 ### Constants
 - **Style**: `UPPER_SNAKE_CASE`
@@ -128,6 +136,7 @@ df.to_parquet(OUTPUT_PATH, index=False)
 - **`groupby` + `transform`** for per-group derived columns
 - **`merge_asof`** for time-aligned joins
 - **Method chaining** for short pipelines; named intermediate variables for complex multi-step logic
+- **Vectorized filtering within loops** for state-based operations (e.g., per-state aggregations): iterate over unique states and use boolean indexing to filter the full dataset within each iteration
 
 ### Example: Vectorized Conditional
 ```python
@@ -190,6 +199,7 @@ def compute_elapsed(df: pd.DataFrame) -> pd.DataFrame:
 
 ### For Scripts with `main()`
 - Print progress messages for long-running steps
+- **Include progress bars for concurrent operations using `tqdm`**
 - Include row counts and game counts so output is verifiable
 - Print a sample of the output at the end
 
@@ -197,6 +207,15 @@ def compute_elapsed(df: pd.DataFrame) -> pd.DataFrame:
 print("Loading play-by-play data...")
 df = load_pbp()
 print(f"  {len(df):,} plays across {df['game_id'].nunique():,} games")
+
+# Example: Progress bar for concurrent processing
+from tqdm import tqdm
+import concurrent.futures
+
+with concurrent.futures.ProcessPoolExecutor() as executor:
+    futures = [executor.submit(func, arg) for arg in args]
+    for f in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc="Processing"):
+        results.append(f.result())
 ```
 
 ---
