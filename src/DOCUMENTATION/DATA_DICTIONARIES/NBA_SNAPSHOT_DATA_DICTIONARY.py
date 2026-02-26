@@ -1,4 +1,4 @@
-import enum
+from enum import Enum
 
 """
 
@@ -14,7 +14,7 @@ import enum
 
 """
 
-class NBA_SNAPSHOT_DATA_DICTIONARY(enum.Enum):
+class NBA_SNAPSHOT_DATA_DICTIONARY(str, Enum):
     GAME_ID = "game_id"
     HOME_TEAM_SPREAD = "home_team_spread"
     TIME_ELAPSED = "time_elapsed"

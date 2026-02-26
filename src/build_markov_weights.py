@@ -63,30 +63,30 @@ def pivot_game_state_data(
     """
     # Prep data
     df = df.sort_values([
-        NSD.GAME_ID.value,
-        NSD.TIME_ELAPSED.value
+        NSD.GAME_ID,
+        NSD.TIME_ELAPSED
     ]).reset_index(drop=True)
 
     # Compute next state's score_diff within each game
-    df["next_score_margin"] = df.groupby(NSD.GAME_ID.value)[NSD.SCORE_MARGIN.value].shift(-1)
+    df["next_score_margin"] = df.groupby(NSD.GAME_ID)[NSD.SCORE_MARGIN].shift(-1)
 
     # Filter to only include states within the time cutoff
-    df = df[df[NSD.TIME_ELAPSED.value] <= time_cutoff].copy()
+    df = df[df[NSD.TIME_ELAPSED] <= time_cutoff].copy()
 
     # Remove rows without a next state (last snapshot of each game has no transition)
     df = df.dropna(subset=["next_score_margin"])
 
     # Compute score change to next state and clip to [-5, 5]
-    df["score_change"] = (df["next_score_margin"] - df[NSD.SCORE_MARGIN.value]).clip(-5, 5).astype(int)
+    df["score_change"] = (df["next_score_margin"] - df[NSD.SCORE_MARGIN]).clip(-5, 5).astype(int)
 
     # Get unique states we want to compute probabilities for
     score_states = np.arange(-20, 21, 2)
     spread_states = np.arange(-15.5, 15.5, 2.0) # example spread states from -15.5 to +15.5 in 2 point increments
     time_states = np.arange(0, time_cutoff + 120, 120) # example time states every 120 seconds
     states = [{
-        NSD.TIME_ELAPSED.value: t,
-        NSD.SCORE_MARGIN.value: s,
-        NSD.HOME_TEAM_SPREAD.value: sp
+        NSD.TIME_ELAPSED: t,
+        NSD.SCORE_MARGIN: s,
+        NSD.HOME_TEAM_SPREAD: sp
     } for t in time_states for s in score_states for sp in spread_states]
 
     
@@ -106,26 +106,26 @@ def pivot_game_state_data(
 
 
 def _compute_state_row(state_row, df, time_padding, score_padding, odds_padding):
-    current_time = state_row[NSD.TIME_ELAPSED.value]
-    current_score = state_row[NSD.SCORE_MARGIN.value]
-    current_spread = state_row[NSD.HOME_TEAM_SPREAD.value]
+    current_time = state_row[NSD.TIME_ELAPSED]
+    current_score = state_row[NSD.SCORE_MARGIN]
+    current_spread = state_row[NSD.HOME_TEAM_SPREAD]
 
     mask = (
-        (df[NSD.TIME_ELAPSED.value] >= current_time - time_padding) &
-        (df[NSD.TIME_ELAPSED.value] <= current_time + time_padding) &
-        (df[NSD.SCORE_MARGIN.value] >= current_score - score_padding) &
-        (df[NSD.SCORE_MARGIN.value] <= current_score + score_padding) &
-        (df[NSD.HOME_TEAM_SPREAD.value] >= current_spread - odds_padding) &
-        (df[NSD.HOME_TEAM_SPREAD.value] <= current_spread + odds_padding)
+        (df[NSD.TIME_ELAPSED] >= current_time - time_padding) &
+        (df[NSD.TIME_ELAPSED] <= current_time + time_padding) &
+        (df[NSD.SCORE_MARGIN] >= current_score - score_padding) &
+        (df[NSD.SCORE_MARGIN] <= current_score + score_padding) &
+        (df[NSD.HOME_TEAM_SPREAD] >= current_spread - odds_padding) &
+        (df[NSD.HOME_TEAM_SPREAD] <= current_spread + odds_padding)
     )
 
     matching_rows = df[mask]
     sample_size = len(matching_rows)
 
     row_data = {
-        NSD.TIME_ELAPSED.value: current_time,
-        NSD.SCORE_MARGIN.value: current_score,
-        NSD.HOME_TEAM_SPREAD.value: current_spread,
+        NSD.TIME_ELAPSED: current_time,
+        NSD.SCORE_MARGIN: current_score,
+        NSD.HOME_TEAM_SPREAD: current_spread,
         "sample_size": sample_size,
     }
 

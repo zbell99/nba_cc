@@ -1,4 +1,4 @@
-import enum
+from enum import Enum
 
 """ Output Columns
 | Column | Type | Description |
@@ -16,7 +16,7 @@ import enum
 ---
 """
 
-class MARKOV_WEIGHTS_DATA_DICTIONARY(enum.Enum):
+class MARKOV_WEIGHTS_DATA_DICTIONARY(str, Enum):
     TIME_ELAPSED = "time_elapsed"
     SCORE_MARGIN = "score_margin"
     HOME_TEAM_SPREAD = "home_team_spread"
