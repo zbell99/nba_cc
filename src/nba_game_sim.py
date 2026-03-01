@@ -1,4 +1,3 @@
-import json
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -18,7 +17,7 @@ from DOCUMENTATION.DATA_DICTIONARIES.CHALLENGE_DISTRIBUTIONS import (
 #-- Paths ────────────────────────────────────────────────────────────────────
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 MARKOV_WEIGHTS_PATH = PROJECT_ROOT / "data" / "markov_weights_120_5_2.5_2760.0.parquet"
-WPA_DATA_PATH = PROJECT_ROOT / "data" / "wpa_challenge_values.json"
+WPA_DATA_PATH = PROJECT_ROOT / "data" / "wpa_challenge_values.parquet"
 
 
 class MarkovWeights:
@@ -167,31 +166,32 @@ def sample_challenges(challenge):
     return sampled_challenges
 
 
-def load_wpa_data(path: Path = WPA_DATA_PATH) -> dict:
-    """Load the WPA challenge values JSON lookup table."""
-    with open(path) as f:
-        return json.load(f)
+def load_wpa_data(path: Path = WPA_DATA_PATH) -> pd.DataFrame:
+    """Load the WPA challenge values Parquet lookup table."""
+    return pd.read_parquet(path)
 
 
-def lookup_wpa(wpa_data: dict, spread: float, time_elapsed: float,
+def lookup_wpa(wpa_data: pd.DataFrame, spread: float, time_elapsed: float,
                score_margin: float, challenge_type: CT) -> float:
     """Look up WPA value for a challenge type at a given game state.
-
-    Keys in the JSON are string representations of integers:
-      spread → str(int(spread)), time → str(int(time_elapsed)),
-      margin → str(int(score_margin))
     """
 
-    #TODO: round spread and margin to align with values that would be in the WPA json
-    spread = str(int(spread))
-    time_elapsed = str(int(time_elapsed))
-    score_margin = str(int(score_margin))
-    return wpa_data[spread][time_elapsed][score_margin][challenge_type]["wpa"]
+    clipped_score_margin = max(min(score_margin, 20), -20)  # clip to range of score margins in WPA data
+    clipped_line = max(min(spread, 15), -15)  # clip to range of lines in WPA data
+
+
+
+    row = wpa_data[(wpa_data['line'] == clipped_line) & (wpa_data['gt'] == time_elapsed) & (wpa_data['m'] == clipped_score_margin)]
+
+    if len(row) == 0:
+        raise ValueError(f"No WPA data found for line={clipped_line}, gt={time_elapsed}, m={clipped_score_margin}")
+
+    return float(row[challenge_type].iloc[0])
 
 
 def derive_challenge_value(
     states: list[GameState],
-    wpa_data: dict,
+    wpa_data: pd.DataFrame,
     spread: float,
 ) -> list[GameState]:
     """Backward DP to compute the value of having 1 or 2 challenges at each state.
@@ -280,18 +280,18 @@ def main():
     with concurrent.futures.ProcessPoolExecutor() as executor:
         futures = [
             executor.submit(_game_with_challenges, initial_time, initial_score_margin, initial_spread, mw, wpa_data)
-            for i in range(1)
+            for i in range(1000)
         ]
         for f in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc=f"Running Game Simulation for Spread {initial_spread}"):
             games.append(f.result())
     
     # Example output: distribution of final score margins after simulating 1000 games
-    # print("Histogram of final score margins after simulating 1000 games:")
-    # plt.hist(games, bins='auto', density=True)
-    # plt.xlabel('Margin')
-    # plt.ylabel(r'% of Simulated Games')
-    # plt.title(f'Scores for Simulated Games - Spread {initial_spread}')
-    # plt.show()
+    print("Histogram of final score margins after simulating 1000 games:")
+    plt.hist(games, bins='auto', density=True)
+    plt.xlabel('Margin')
+    plt.ylabel(r'% of Simulated Games')
+    plt.title(f'Scores for Simulated Games - Spread {initial_spread}')
+    plt.show()
 
 if __name__ == "__main__":
     main()

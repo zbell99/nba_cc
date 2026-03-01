@@ -65,7 +65,7 @@ library(ggthemes)
 ## 4. Data Manipulation
 
 ### Preferred Syntax
-- **Pipe Operator**: Use `%>%` for method chaining
+- **Pipe Operator**: Use `|>` for method chaining
 - **dplyr Verbs**: 
   - `filter()` - Subset rows by conditions
   - `select()` - Choose or create columns
@@ -77,9 +77,9 @@ library(ggthemes)
 
 ### Example Pattern
 ```r
-df_enhanced <- df %>%
-  filter(condition) %>%
-  mutate(new_col = calculation) %>%
+df_enhanced <- df |>
+  filter(condition) |>
+  mutate(new_col = calculation) |>
   select(-unwanted_col)
 ```
 
@@ -92,11 +92,11 @@ df_enhanced <- df %>%
 
 **Example:**
 ```r
-df <- df %>%
+df <- df |>
   distinct(key_col1, key_col2, .keep_all = TRUE)
 
-df_clean <- df %>%
-  filter(abs(column) < threshold) %>%
+df_clean <- df |>
+  filter(abs(column) < threshold) |>
   mutate(new_col = coalesce(option1, option2))
 ```
 
@@ -189,7 +189,7 @@ Before finalizing code:
 - [ ] Visualizations include all necessary labels
 - [ ] Colors are colorblind-friendly
 - [ ] Code is readable (proper spacing, indentation)
-- [ ] Pipes (`%>%`) are line-broken for readability
+- [ ] Pipes (`|>`) are line-broken for readability
 - [ ] Temporary columns are cleaned up after use
 - [ ] Edge cases are handled (filtering, NAs, infinite values)
 
@@ -215,7 +215,7 @@ When working with this codebase:
 - Preserve the `snake_case` naming convention
 - Always use tidyverse/dplyr patterns over base R when possible
 - Include meaningful comments for non-obvious operations
-- Chain operations with `%>%` rather than intermediate assignments (when appropriate)
+- Chain operations with `|>` rather than intermediate assignments (when appropriate)
 - Ensure visualizations follow the ggplot2 patterns outlined above
 - Handle edge cases explicitly (NAs, infinite values, outliers)
 - Document transformations clearly so the logic is reproducible
