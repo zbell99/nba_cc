@@ -26,7 +26,7 @@ Transform the preprocessed game state snapshots (`data/nba_snapshot_data.parquet
 ---
 
 ## Output Dataset
-- **File**: `data/markov_weights_{time_pad}_{score_pad}_{odds_pad}_{time_cutoff}.parquet`
+- **File**: `data/markov_weights_v{x}.parquet`
 - **Builder script**: `src/build_markov_weights.py`
 - **Format**: Parquet
 
@@ -44,6 +44,10 @@ Transform the preprocessed game state snapshots (`data/nba_snapshot_data.parquet
 | `p+5` | float64 | P(next score_margin ≥ current + 5) |
 
 ---
+
+### Version History
+v1: 15 second time gap, 120 second time padding, 5 point padding, 2.5 line padding, 2760 seconds
+v2: 45 second time gap, 120 second time padding, 5 point padding, 2.5 line padding, 2880 seconds
 
 ## How It Works
 
