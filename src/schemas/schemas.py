@@ -48,6 +48,6 @@ class GameStateInput(pydantic.BaseModel):
 
     @property
     def time_elapsed(self):
-        return (self.period - 1) * 720 + (12-self.minute) * 60 + (60-self.second)
+        return (self.period - 1) * 720 + (11-self.minute) * 60 + (60-self.second)
     
     

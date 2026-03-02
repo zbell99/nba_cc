@@ -16,8 +16,9 @@ from DOCUMENTATION.DATA_DICTIONARIES.CHALLENGE_DISTRIBUTIONS import (
 
 #-- Paths ────────────────────────────────────────────────────────────────────
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-MARKOV_WEIGHTS_PATH = PROJECT_ROOT / "data" / "markov_weights_120_5_2.5_2760.0.parquet"
+MARKOV_WEIGHTS_PATH = PROJECT_ROOT / "data" / "markov_weights_v2.parquet"
 WPA_DATA_PATH = PROJECT_ROOT / "data" / "wpa_challenge_values.parquet"
+WPA_SIM_PATH = PROJECT_ROOT / "data" / "wpa_challenge_values_sim.parquet"
 
 
 class MarkovWeights:
@@ -75,7 +76,7 @@ class GameSimulation:
 
         
 
-    def simulate_game(self, time_cutoff: float=2760):
+    def simulate_game(self, time_cutoff: float=2880):
         while self.states[-1].time_elapsed < time_cutoff:
             next_state = self.sample_next_state(self.states[-1])
 
@@ -251,42 +252,68 @@ def derive_challenge_value(
     return states
 
 
-def _game_with_challenges(initial_time, initial_score_margin, initial_spread, mw, wpa_data):
-    simulation = GameSimulation(initial_time, initial_score_margin, initial_spread, mw, time_per_step=15)
+def _game_with_challenges(initial_time, initial_score_margin, initial_spread, time_per_step, mw, wpa_data):
+    simulation = GameSimulation(initial_time, initial_score_margin, initial_spread, mw, time_per_step=time_per_step)
     states = simulation.simulate_game()
     states = derive_challenge_value(states, wpa_data, initial_spread)
     final_state = states[-1]
     return final_state.score_margin
 
 
-def main():
-    print("Loading Markov weights...")
-    markov_weights = read_markov_weights(MARKOV_WEIGHTS_PATH)
-    mw = MarkovWeights(markov_weights, time_gap=120, score_gap=2, odds_gap=2.0)
-    print(f"  {len(markov_weights):,} states with Markov weights")
+def _game_with_ev_data(initial_time, initial_score_margin, initial_spread, time_per_step, mw, wpa_data):
+    """Run one simulation and return per-state EV data for accumulation.
 
-    print("Loading WPA challenge values...")
-    wpa_data = load_wpa_data(WPA_DATA_PATH)
-    print("  WPA data loaded")
+    Returns
+    -------
+    list[tuple[float, int, float, float]]
+        Each element is (time_elapsed, score_margin_clipped, value_save_1, value_save_2)
+        for every state in the simulated trajectory.
+    """
+    simulation = GameSimulation(initial_time, initial_score_margin, initial_spread, mw, time_per_step=time_per_step)
+    states = simulation.simulate_game()
+    states = derive_challenge_value(states, wpa_data, initial_spread)
 
-    # Example usage: simulate a game starting at 0 seconds and 0 score margin with a pregame spread of -3.5
-    initial_time = 0.0
-    initial_score_margin = 0
-    initial_spread = 2.0
+    results = []
+    for state in states:
+        clipped_m = int(max(min(state.score_margin, 20), -20))
+        results.append((state.time_elapsed, clipped_m, state.value_save_1, state.value_save_2))
+    return results
 
-    print(f"Simulating game with initial state: time_elapsed={initial_time}, score_margin={initial_score_margin}, home_team_spread={initial_spread} ...")
+
+def main(
+        sample_size=1000,
+        initial_time=0.0,
+        initial_score_margin=0,
+        initial_spread=-15.0,
+        time_per_step=45,
+        mw=None,
+        wpa_data=None
+    ):
+
+    if mw is None:
+        print("Loading Markov weights...")
+        markov_weights = read_markov_weights(MARKOV_WEIGHTS_PATH)
+        mw = MarkovWeights(markov_weights, time_gap=45, score_gap=1, odds_gap=1.0)
+        print(f"  {len(markov_weights):,} states with Markov weights")
+
+    if wpa_data is None:
+        print("Loading WPA challenge values...")
+        wpa_data = load_wpa_data(WPA_DATA_PATH)
+        print("  WPA data loaded")
+
+    # print(f"Simulating game with initial state: time_elapsed={initial_time}, score_margin={initial_score_margin}, home_team_spread={initial_spread} ...")
     games = []
 
     with concurrent.futures.ProcessPoolExecutor() as executor:
         futures = [
-            executor.submit(_game_with_challenges, initial_time, initial_score_margin, initial_spread, mw, wpa_data)
-            for i in range(1000)
+            executor.submit(_game_with_challenges, initial_time, initial_score_margin, initial_spread, time_per_step,mw, wpa_data)
+            for i in range(sample_size)
         ]
         for f in tqdm(concurrent.futures.as_completed(futures), total=len(futures), desc=f"Running Game Simulation for Spread {initial_spread}"):
             games.append(f.result())
     
     # Example output: distribution of final score margins after simulating 1000 games
-    print("Histogram of final score margins after simulating 1000 games:")
+    print(f"Histogram of final score margins after simulating {sample_size} games:")
     plt.hist(games, bins='auto', density=True)
     plt.xlabel('Margin')
     plt.ylabel(r'% of Simulated Games')
@@ -294,4 +321,4 @@ def main():
     plt.show()
 
 if __name__ == "__main__":
-    main()
+    main(sample_size=1000)
