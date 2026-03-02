@@ -47,7 +47,6 @@ sys.path.insert(0, str(SRC_DIR))
 
 from nba_game_sim import (
     read_markov_weights,
-    load_wpa_data,
     MarkovWeights,
     _game_with_ev_data,
     MARKOV_WEIGHTS_PATH,
