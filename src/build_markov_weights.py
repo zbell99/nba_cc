@@ -27,10 +27,11 @@ def game_state_data() -> pd.DataFrame:
 
 def pivot_game_state_data(
     df: pd.DataFrame,
+    time_gap: int = 15, #must be a multiple of 15 to match snapshot intervals
     time_padding: int = 0,
     score_padding: int = 0,
     odds_padding: float = 0.5,
-    time_cutoff: float = 2760 # first 46 minutes (2760 seconds) to exclude end-of-game states with few transitions
+    time_cutoff: float = 2880 # first 48 minutes (2880 seconds) to exclude end-of-game states with few transitions
 ) -> pd.DataFrame:
     """
     Pivot the game state data to create Markov weight distributions.
@@ -67,6 +68,9 @@ def pivot_game_state_data(
         NSD.TIME_ELAPSED
     ]).reset_index(drop=True)
 
+    # only have states every time_gap seconds to reduce number of states and ensure we have enough samples in each state to compute probabilities (e.g., if time_gap is 15, we only keep states at 0s, 15s, 30s, etc)
+    df = df[df[NSD.TIME_ELAPSED] % time_gap == 0].copy()
+
     # Compute next state's score_diff within each game
     df["next_score_margin"] = df.groupby(NSD.GAME_ID)[NSD.SCORE_MARGIN].shift(-1)
 
@@ -80,9 +84,9 @@ def pivot_game_state_data(
     df["score_change"] = (df["next_score_margin"] - df[NSD.SCORE_MARGIN]).clip(-5, 5).astype(int)
 
     # Get unique states we want to compute probabilities for
-    score_states = np.arange(-20, 21, 2)
-    spread_states = np.arange(-15.5, 15.5, 2.0) # example spread states from -15.5 to +15.5 in 2 point increments
-    time_states = np.arange(0, time_cutoff + 120, 120) # example time states every 120 seconds
+    score_states = np.arange(-20, 21)
+    spread_states = np.arange(-15.5, 15.5, 1.0) # example spread states from -15.5 to +15.5 in 2 point increments
+    time_states = np.arange(0, time_cutoff + 45, 45) # example time states every 45 seconds
     states = [{
         NSD.TIME_ELAPSED: t,
         NSD.SCORE_MARGIN: s,
@@ -147,11 +151,12 @@ def main():
     print(f"  {len(df):,} snapshot rows")
 
     print("Pivoting to Markov weights...")
+    time_gap = 45 #seconds
     time_padding = 120 #seconds
     score_padding = 5 #points
     odds_padding = 2.5 #points
-    time_cutoff = 2760.0 #seconds
-    weights_df = pivot_game_state_data(df, time_padding=time_padding, score_padding=score_padding, odds_padding=odds_padding, time_cutoff=time_cutoff)
+    time_cutoff = 2880.0 #seconds
+    weights_df = pivot_game_state_data(df, time_gap=time_gap, time_padding=time_padding, score_padding=score_padding, odds_padding=odds_padding, time_cutoff=time_cutoff)
     print(f"  {len(weights_df):,} unique states with weights")
 
     # example of what the output looks like (all columns)
@@ -160,7 +165,7 @@ def main():
         print(weights_df[col].iloc[0])
 
     print(f"Saving to {PROJECT_ROOT / 'data' / 'markov_weights.parquet'} ...")
-    weights_df.to_parquet(PROJECT_ROOT / "data" / f"markov_weights_{time_padding}_{score_padding}_{odds_padding}_{time_cutoff}.parquet", index=False)
+    weights_df.to_parquet(PROJECT_ROOT / "data" / f"markov_weights_v2.parquet", index=False)
 
 
 if __name__ == "__main__":
