@@ -1,6 +1,6 @@
 import pydantic
 from pydantic import field_validator
-# from src.DOCUMENTATION.DATA_DICTIONARIES.CHALLENGE_TYPES import 
+from src.DOCUMENTATION.DATA_DICTIONARIES.CHALLENGE_DISTRIBUTIONS import ChallengeType as CT
 
 class GameStateInput(pydantic.BaseModel):
     spread: float #clip to +/- 20
@@ -8,7 +8,7 @@ class GameStateInput(pydantic.BaseModel):
     minute: int #btwn 0 and 12
     second: int #btwn 0 and 60
     score_margin: int #clip to +/- 20
-    challenge_type: str #
+    challenge_type: CT
 
     @field_validator('spread')
     @classmethod
