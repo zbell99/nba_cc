@@ -1,0 +1,199 @@
+/* ── Shell ────────────────────────────────────────────── */
+.shell {
+  width: 100%;
+  max-width: 820px;
+  padding: 2.5rem 2.5rem 2rem;
+  background: #231710;
+  border: 1px solid #3a2518;
+  border-radius: 16px;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+/* ── Title ─────────────────────────────────────────────── */
+h1 {
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  text-align: center;
+  margin-bottom: 1.75rem;
+  color: #f5ebe0;
+}
+
+h1::after {
+  content: '';
+  display: block;
+  width: 48px;
+  height: 3px;
+  margin: 0.6rem auto 0;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #e85d04, #f48c06);
+}
+
+/* ── Two-column layout ─────────────────────────────────── */
+.layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  align-items: start;
+}
+
+@media (max-width: 640px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.right-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.placeholder {
+  padding: 2rem 1rem;
+  text-align: center;
+  color: #7a6252;
+  font-size: 0.9rem;
+  border: 1px dashed #3a2518;
+  border-radius: 12px;
+}
+
+/* ── Form ──────────────────────────────────────────────── */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex: 1;
+}
+
+.field label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #b8977a;
+}
+
+.field input,
+.field select {
+  padding: 0.6rem 0.75rem;
+  border: 1px solid #3a2518;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  background: #2c1b10;
+  color: #f5ebe0;
+  transition: border-color 200ms, box-shadow 200ms;
+  outline: none;
+}
+
+.field input:focus,
+.field select:focus {
+  border-color: #e85d04;
+  box-shadow: 0 0 0 3px rgba(232, 93, 4, 0.2);
+}
+
+.field input::placeholder {
+  color: #5c4433;
+}
+
+.field select option {
+  background: #2c1b10;
+  color: #f5ebe0;
+}
+
+.row {
+  display: flex;
+  gap: 1rem;
+}
+
+/* ── Button ────────────────────────────────────────────── */
+.submit-btn {
+  margin-top: 0.75rem;
+  padding: 0.7rem;
+  background: linear-gradient(135deg, #e85d04, #f48c06);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 150ms, transform 100ms;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.submit-btn:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.submit-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.submit-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ── Error ─────────────────────────────────────────────── */
+.error {
+  margin-top: 1rem;
+  padding: 0.7rem 0.85rem;
+  background: rgba(220, 38, 38, 0.12);
+  border: 1px solid rgba(220, 38, 38, 0.35);
+  color: #fca5a5;
+  border-radius: 8px;
+  font-size: 0.85rem;
+}
+
+/* ── Results ───────────────────────────────────────────── */
+.results {
+  margin-top: 1.5rem;
+  padding: 1.25rem;
+  background: #2c1b10;
+  border: 1px solid #3a2518;
+  border-radius: 12px;
+}
+
+.results h2 {
+  margin: 0 0 0.85rem 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #f48c06;
+}
+
+.results table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.results tr + tr {
+  border-top: 1px solid #3a2518;
+}
+
+.results td {
+  padding: 0.55rem 0;
+  font-size: 0.9rem;
+}
+
+.results td.label {
+  font-weight: 500;
+  color: #b8977a;
+  width: 55%;
+}
+
+.results td:last-child {
+  text-align: right;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #f5ebe0;
+}
+
